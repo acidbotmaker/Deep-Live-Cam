@@ -538,7 +538,7 @@ def update_popup_source(
 def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
     global preview_label, preview_slider
 
-    preview = ctk.CTkToplevel(parent)
+    preview = ctk.CTkToplevel(parent, width=640, height=480)
     preview.withdraw()
     preview.title(_("Preview"))
     preview.configure()
@@ -696,6 +696,12 @@ def check_and_ignore_nsfw(target, destroy: Callable = None) -> bool:
 
 
 def fit_image_to_size(image, width: int, height: int):
+    if image is None:
+        raise ValueError("Image is None. Webcam frame capture might have failed.")
+
+    if image.size == 0:
+        raise ValueError("Image is empty. Check the frame capture process.")
+
     if width is None and height is None:
         return image
     h, w, _ = image.shape
@@ -707,6 +713,10 @@ def fit_image_to_size(image, width: int, height: int):
         ratio_w = width / w
     ratio = max(ratio_w, ratio_h)
     new_size = (int(ratio * w), int(ratio * h))
+
+    if new_size[0] <= 0 or new_size[1] <= 0:
+        raise ValueError(f"Invalid target size for resizing: {new_size}")
+
     return cv2.resize(image, dsize=new_size)
 
 
@@ -882,10 +892,13 @@ def create_webcam_preview(camera_index: int):
     frame_count = 0
     fps = 0
 
+    if PREVIEW.winfo_width() < 50 or PREVIEW.winfo_height() < 50:
+        input("Waiting for user to resize...")
+
     while True:
         ret, frame = cap.read()
-        if not ret:
-            break
+        if not ret or frame is None:
+            raise RuntimeError("Failed to capture frame from webcam.")
 
         temp_frame = frame.copy()
 
